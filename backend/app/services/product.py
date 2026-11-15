@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.feedback import FeedbackService
 from app.store import store
 
 MODULE = "product"
@@ -10,6 +11,8 @@ REQUIRED_FIELDS = ["产品编号", "产品名称", "产品类型"]
 STATUS_ORDER = ["草稿", "开发中", "已发布", "已下线"]
 ACTION_RULES = {"发布产品": "草稿", "下线产品": "已发布", "删除产品": "已下线"}
 NEGATIVE_ACTIONS = ["下线产品"]
+
+feedback_service = FeedbackService()
 
 
 class ProductService:
@@ -28,10 +31,24 @@ class ProductService:
             rows = [row for row in rows if row.get("status") == status]
         total = len(rows)
         start = max(page - 1, 0) * size
-        return rows[start:start + size], total
+        return [self._attach_feedback(row) for row in rows[start:start + size]], total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        entry = store.find(MODULE, entry_id)
+        if entry is None:
+            return None
+        return self._attach_feedback(entry)
+
+    def _attach_feedback(self, row: dict[str, Any]) -> dict[str, Any]:
+        """读取最新质量反馈处理结果并更新未解决数量，供产品准入判断。"""
+        data = dict(row)
+        summary = feedback_service.summary_for_product(
+            str(row.get("产品名称") or ""),
+            str(row.get("产品编号") or ""),
+        )
+        data["未解决数量"] = summary["未解决数量"]
+        data["最新质量反馈处理结果"] = summary["最新质量反馈处理结果"]
+        return data
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]

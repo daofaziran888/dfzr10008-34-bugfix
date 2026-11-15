@@ -36,7 +36,7 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">{{ formatCell(row, column) }}</td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -70,7 +70,7 @@ import { request } from '@/api/client'
 type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/product'
-const columns = ["产品编号", "产品名称", "产品类型", "数据来源", "计算逻辑", "输出格式", "负责人", "产品状态"]
+const columns = ["产品编号", "产品名称", "产品类型", "数据来源", "计算逻辑", "输出格式", "负责人", "产品状态", "未解决数量", "最新质量反馈处理结果"]
 const actions = ["发布产品", "下线产品", "删除产品"]
 const statuses = ["草稿", "开发中", "已发布", "已下线"]
 const stats = [{"label": "数据产品总数", "value": 0}, {"label": "已发布产品", "value": 0}, {"label": "已下线产品", "value": 0}]
@@ -80,6 +80,16 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+
+function formatCell(row: Row, column: string): string | number {
+  const value = row[column]
+  if (column === '最新质量反馈处理结果') {
+    if (!value || typeof value !== 'object') return '—'
+    const result = value as Record<string, string>
+    return [result['反馈编号'], result['处理状态']].filter(Boolean).join(' · ') || '—'
+  }
+  return (value as string | number | null) ?? '—'
+}
 
 function resetFilters() {
   filters.value = {}
